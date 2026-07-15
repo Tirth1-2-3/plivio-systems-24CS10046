@@ -153,17 +153,20 @@ int main() {
     for (;;) {
         const ssize_t length = recvfrom(input, packet.data(), packet.size(), 0, nullptr, nullptr);
         if (length != static_cast<ssize_t>(packet.size())) continue;
-        std::uint32_t network_block;
-        std::memcpy(&network_block, packet.data(), sizeof(network_block));
-        const std::uint32_t block_number = ntohl(network_block);
-        const int shard = packet[4];
+        const std::uint32_t wire_id =
+            (static_cast<std::uint32_t>(packet[0]) << 16) |
+            (static_cast<std::uint32_t>(packet[1]) << 8) |
+            static_cast<std::uint32_t>(packet[2]);
+        const std::uint32_t block_number = wire_id >> 3;
+        const int shard = wire_id & 0x07;
         if (shard >= kShardCount) continue;
 
         Block& block = blocks[block_number];
         if (block.received[shard]) continue;  // Duplicate caused by the relay.
         block.received[shard] = true;
         ++block.received_count;
-        std::memcpy(block.shards[shard].data(), packet.data() + 5, kShardBytes);
+        std::memcpy(block.shards[shard].data(),
+                    packet.data() + kWireIdBytes, kShardBytes);
 
         if (shard < kDataShards) {
             forward_frame(output, player, block_number,

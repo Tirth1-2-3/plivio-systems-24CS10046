@@ -16,10 +16,13 @@ constexpr int kRelayPort = 47001;
 bool send_shard(int socket_fd, const sockaddr_in& relay, std::uint32_t block,
                 std::uint8_t shard, const Shard& payload) {
     std::array<std::uint8_t, kShardPacketBytes> packet{};
-    const std::uint32_t network_block = htonl(block);
-    std::memcpy(packet.data(), &network_block, sizeof(network_block));
-    packet[4] = shard;
-    std::memcpy(packet.data() + 5, payload.data(), payload.size());
+    // Pack a 21-bit frame number and 3-bit shard number into three bytes.
+    // At 50 frames/second, the frame field lasts more than 11 hours.
+    const std::uint32_t wire_id = (block << 3) | shard;
+    packet[0] = static_cast<std::uint8_t>(wire_id >> 16);
+    packet[1] = static_cast<std::uint8_t>(wire_id >> 8);
+    packet[2] = static_cast<std::uint8_t>(wire_id);
+    std::memcpy(packet.data() + kWireIdBytes, payload.data(), payload.size());
     return sendto(socket_fd, packet.data(), packet.size(), 0,
                   reinterpret_cast<const sockaddr*>(&relay), sizeof(relay)) ==
            static_cast<ssize_t>(packet.size());

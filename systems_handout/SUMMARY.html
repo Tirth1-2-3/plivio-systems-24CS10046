@@ -26,9 +26,10 @@
   later source frame.</p>
 
   <h2>Wire format and bandwidth</h2>
-  <p>Every sender-to-receiver datagram contains a 4-byte big-endian block number,
-  a 1-byte shard index, and a 40-byte shard. Seven 45-byte packets protect one
-  160-byte frame: <code>7 * 45 / 160 = 1.96875x</code>. No feedback packets
+  <p>Every sender-to-receiver datagram contains a compact 3-byte identifier that
+  combines a 21-bit frame number with a 3-bit shard index, followed by a 40-byte
+  shard. Seven 43-byte packets protect one 160-byte frame:
+  <code>7 * 43 / 160 = 1.88125x</code>. No feedback packets
   are used, leaving the measured overhead safely below the 2.0x limit.</p>
 
   <h2>Receiver</h2>
@@ -49,12 +50,12 @@
   <h2>Timing and observed result</h2>
   <table>
     <tr><th>Profile</th><th>Delay</th><th>Miss rate</th><th>Overhead</th></tr>
-    <tr><td>A, seed 1 (10 s)</td><td>45 ms</td><td>0.00%</td><td>1.97x</td></tr>
-    <tr><td>B, seed 1 (30 s)</td><td>81 ms</td><td>0.33%</td><td>1.97x</td></tr>
-    <tr><td>B, seed 2 (30 s)</td><td>81 ms</td><td>0.60%</td><td>1.97x</td></tr>
-    <tr><td>B, seed 3 (30 s)</td><td>81 ms</td><td>0.47%</td><td>1.97x</td></tr>
+    <tr><td>A, seed 1 (10 s)</td><td>45 ms</td><td>0.40%</td><td>1.88x</td></tr>
+    <tr><td>B, seed 1 (30 s)</td><td>80 ms</td><td>0.73%</td><td>1.88x</td></tr>
+    <tr><td>B, seed 2 (30 s)</td><td>80 ms</td><td>0.73%</td><td>1.88x</td></tr>
+    <tr><td>B, seed 3 (30 s)</td><td>80 ms</td><td>0.47%</td><td>1.88x</td></tr>
   </table>
-  <p class="result"><strong>Recommended grading delay: 81 ms.</strong> The main
+  <p class="result"><strong>Recommended grading delay: 80 ms.</strong> The main
   failure modes are one frame losing more than three shards and unusually long
   correlated delay/loss bursts that push all recovery options past its deadline.</p>
 </body>

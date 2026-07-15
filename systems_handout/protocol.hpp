@@ -12,13 +12,15 @@ constexpr int kShardCount = kDataShards + kParityShards;
 constexpr int kFrameBytes = 160;
 constexpr int kShardBytes = kFrameBytes * kFramesPerBlock / kDataShards;
 constexpr int kShardsPerFrame = kDataShards / kFramesPerBlock;
-constexpr int kShardPacketBytes = 4 + 1 + kShardBytes;
+constexpr int kWireIdBytes = 3;
+constexpr int kShardPacketBytes = kWireIdBytes + kShardBytes;
 
 static_assert(kFrameBytes % kDataShards == 0,
               "A frame must split evenly across the data shards");
 static_assert(kShardCount * kShardPacketBytes <=
                   2 * kFramesPerBlock * kFrameBytes,
               "The wire format must stay within the 2x bandwidth cap");
+static_assert(kShardCount <= 8, "The shard number must fit in three bits");
 
 using Frame = std::array<std::uint8_t, kFrameBytes>;
 using Shard = std::array<std::uint8_t, kShardBytes>;

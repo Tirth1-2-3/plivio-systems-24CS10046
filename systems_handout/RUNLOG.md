@@ -1,7 +1,8 @@
 # Experiment log
 
 The final implementation uses immediate per-frame erasure coding: four 40-byte
-data shards and three 40-byte parity shards. Its measured bandwidth is 1.97x.
+data shards and three 40-byte parity shards. A compact three-byte wire ID lowers
+its measured bandwidth to 1.88x.
 
 | Design | Profile | Seed | Duration | Delay | Misses | Miss rate | Overhead | Result |
 |---|---|---:|---:|---:|---:|---:|---:|---|
@@ -21,6 +22,12 @@ data shards and three 40-byte parity shards. Its measured bandwidth is 1.97x.
 | Per-frame, 40-byte shards | B | 1 | 30 s | 85 ms | 1/1500 | 0.07% | 1.97x | VALID |
 | Per-frame, 40-byte shards | B | 2 | 30 s | 85 ms | 1/1500 | 0.07% | 1.97x | VALID |
 | Per-frame, 40-byte shards | A | 1 | 10 s | 45 ms | 0/500 | 0.00% | 1.97x | VALID |
+| Two-parity experiment | B | 1 | 10 s | 81 ms | 23/500 | 4.60% | 1.69x | INVALID |
+| Compact 3-byte ID | B | 2 | 10 s | 79 ms | 6/500 | 1.20% | 1.88x | INVALID |
+| Compact 3-byte ID | B | 1 | 30 s | 80 ms | 11/1500 | 0.73% | 1.88x | VALID |
+| Compact 3-byte ID | B | 2 | 30 s | 80 ms | 11/1500 | 0.73% | 1.88x | VALID |
+| Compact 3-byte ID | B | 3 | 30 s | 80 ms | 7/1500 | 0.47% | 1.88x | VALID |
+| Compact 3-byte ID | A | 1 | 10 s | 45 ms | 2/500 | 0.40% | 1.88x | VALID |
 
 ## Changes and reasoning
 
@@ -31,7 +38,9 @@ data shards and three 40-byte parity shards. Its measured bandwidth is 1.97x.
 3. The final design splits one frame into four 40-byte shards and creates its
    three parity shards immediately. This removes coding wait entirely while
    retaining correction of any three lost packets.
-4. At 80 ms the result depended too closely on relay and process scheduling;
-   one visible seed crossed the miss cap. At 81 ms, three full-length Profile B
-   seeds remained between 0.33% and 0.60%, so **81 ms is the lowest validated
-   grading recommendation**.
+4. Removing one parity packet saved bandwidth but exceeded the miss cap, so the
+   final design retains all three parity shards.
+5. Combining the frame and shard numbers into a three-byte ID reduced overhead
+   from 1.97x to 1.88x. It also reduced packet processing enough for three full
+   Profile B seeds to remain valid at **80 ms**, which is the final grading
+   recommendation; 79 ms failed the boundary test.
