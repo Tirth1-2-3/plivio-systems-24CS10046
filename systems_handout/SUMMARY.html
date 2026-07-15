@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flaky Network Transport Summary</title>
+  <style>
+    body { max-width: 900px; margin: 40px auto; padding: 0 24px; font: 17px/1.55 system-ui, sans-serif; color: #172033; }
+    h1, h2 { line-height: 1.2; color: #0b3b66; }
+    .flow { padding: 18px; border-radius: 10px; background: #eef6fc; text-align: center; font-weight: 600; }
+    code { background: #f1f3f5; padding: 2px 5px; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #ccd5df; padding: 9px; text-align: left; }
+    .result { border-left: 5px solid #16844a; padding: 10px 16px; background: #effaf4; }
+  </style>
+</head>
+<body>
+  <h1>The Flaky Network: architecture and design</h1>
+  <p class="flow">Harness source :47010 &rarr; C++ sender &rarr; hostile relay :47001/:47002 &rarr; C++ receiver &rarr; harness player :47020</p>
+
+  <h2>Sender</h2>
+  <p>The sender receives one numbered 160-byte frame every 20 ms. It divides the
+  sequence into blocks of four frames. Each frame is sent immediately as a
+  systematic shard, so an undamaged packet takes no coding delay. Once all four
+  frames exist, the sender creates three parity shards using a Cauchy coding
+  matrix over GF(256). This gives seven independently impaired UDP datagrams per
+  block.</p>
+
+  <h2>Wire format and bandwidth</h2>
+  <p>Every sender-to-receiver datagram contains a 4-byte big-endian block number,
+  a 1-byte shard index, and a 160-byte shard. Seven 165-byte packets protect four
+  160-byte frames: <code>7 * 165 / (4 * 160) = 1.8047x</code>. No feedback packets
+  are used, leaving the measured overhead safely below the 2.0x limit.</p>
+
+  <h2>Receiver</h2>
+  <p>The receiver stores unique shards by block and ignores relay duplicates.
+  Systematic shards are converted directly back to the harness format and sent
+  to the player. If a frame was lost, receipt of any four shards supplies four
+  independent equations. Gaussian elimination in GF(256) inverts those equations
+  and reconstructs the missing payload byte-for-byte. The reconstructed frame is
+  then emitted with its original sequence number.</p>
+
+  <h2>Why forward error correction</h2>
+  <p>Retransmission requires a loss to be noticed and then sends both a request and
+  a reply through the same lossy, delayed relay. Proactive parity spends bandwidth
+  before a loss is known and usually makes recovery available as soon as the last
+  data/parity packets in a block arrive. Up to three lost datagrams in one
+  seven-packet block are recoverable.</p>
+
+  <h2>Timing and observed result</h2>
+  <table>
+    <tr><th>Profile</th><th>Delay</th><th>Miss rate</th><th>Overhead</th></tr>
+    <tr><td>A, seed 1 (10 s)</td><td>100 ms</td><td>0.00%</td><td>1.80x</td></tr>
+    <tr><td>B, seed 1 (30 s)</td><td>120 ms</td><td>0.53%</td><td>1.80x</td></tr>
+    <tr><td>B, seed 2 (10 s)</td><td>120 ms</td><td>0.40%</td><td>1.80x</td></tr>
+  </table>
+  <p class="result"><strong>Recommended grading delay: 120 ms.</strong> The main
+  failure modes are a block losing more than three shards and unusually long
+  correlated delay/loss bursts that push all recovery options past a deadline.</p>
+</body>
+</html>
