@@ -14,7 +14,7 @@ constexpr int kInputPort = 47010;
 constexpr int kRelayPort = 47001;
 
 bool send_shard(int socket_fd, const sockaddr_in& relay, std::uint32_t block,
-                std::uint8_t shard, const Payload& payload) {
+                std::uint8_t shard, const Shard& payload) {
     std::array<std::uint8_t, kShardPacketBytes> packet{};
     const std::uint32_t network_block = htonl(block);
     std::memcpy(packet.data(), &network_block, sizeof(network_block));
@@ -52,8 +52,8 @@ int main() {
     relay.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
     GaloisField gf;
-    std::array<Payload, kDataShards> data{};
-    std::array<std::uint8_t, 4 + kPayloadBytes> source_packet{};
+    std::array<Shard, kDataShards> data{};
+    std::array<std::uint8_t, 4 + kFrameBytes> source_packet{};
 
     for (;;) {
         const ssize_t length = recvfrom(input, source_packet.data(), source_packet.size(), 0, nullptr, nullptr);
@@ -61,17 +61,26 @@ int main() {
         std::uint32_t network_sequence;
         std::memcpy(&network_sequence, source_packet.data(), sizeof(network_sequence));
         const std::uint32_t sequence = ntohl(network_sequence);
-        const int shard = static_cast<int>(sequence % kDataShards);
-        const std::uint32_t block = sequence / kDataShards;
-        std::memcpy(data[shard].data(), source_packet.data() + 4, kPayloadBytes);
-        send_shard(output, relay, block, static_cast<std::uint8_t>(shard), data[shard]);
+        const int frame_in_block = static_cast<int>(sequence % kFramesPerBlock);
+        const std::uint32_t block = sequence / kFramesPerBlock;
 
-        if (shard != kDataShards - 1) continue;
+        // Split each frame into small shards so its parity can be sent now,
+        // without waiting for future frames to arrive.
+        for (int part = 0; part < kShardsPerFrame; ++part) {
+            const int shard = frame_in_block * kShardsPerFrame + part;
+            std::memcpy(data[shard].data(),
+                        source_packet.data() + 4 + part * kShardBytes,
+                        kShardBytes);
+            send_shard(output, relay, block, static_cast<std::uint8_t>(shard),
+                       data[shard]);
+        }
+
+        if (frame_in_block != kFramesPerBlock - 1) continue;
         for (int parity = 0; parity < kParityShards; ++parity) {
-            Payload encoded{};
+            Shard encoded{};
             for (int original = 0; original < kDataShards; ++original) {
                 const auto coefficient = gf.coefficient(parity, original);
-                for (int byte = 0; byte < kPayloadBytes; ++byte)
+                for (int byte = 0; byte < kShardBytes; ++byte)
                     encoded[byte] ^= gf.multiply(coefficient, data[original][byte]);
             }
             send_shard(output, relay, block,

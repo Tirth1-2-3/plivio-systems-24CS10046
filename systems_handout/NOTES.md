@@ -1,11 +1,11 @@
 # Design notes
 
-The sender uses systematic erasure coding over groups of four 160-byte frames.
-Each original frame is transmitted immediately, followed by three parity shards when the fourth frame in its group arrives.
-The parity coefficients form a Cauchy matrix over GF(256), allowing the receiver to rebuild all four originals from any four of the seven shards.
-The receiver forwards surviving original shards immediately and only decodes when an original is missing. When packets arrive out of order, it checks every four-shard subset and uses an invertible one, rather than assuming the first four packets form the best decoding basis.
-Packets contain a four-byte block number, one-byte shard number, and 160 bytes of data.
-This consumes about 1.80x raw bandwidth and sends no feedback traffic.
-Please grade the solution at **120 ms** playout delay.
-The design breaks when more than three shards from one coding group are lost, or when every usable shard for a frame arrives after its deadline.
-Long correlated loss bursts and jitter substantially beyond the visible profiles are therefore its main weaknesses.
+Each 160-byte source frame is split immediately into four 40-byte data shards and encoded with three 40-byte Cauchy/Reed-Solomon parity shards over GF(256).
+The seven 45-byte UDP packets are sent as soon as the frame arrives, so loss recovery never waits for a future frame.
+Any four of the seven shards reconstruct the complete frame, allowing any three packet losses within one frame.
+The receiver ignores duplicates, forwards a frame once all four data shards arrive, or reconstructs it by inverting a four-equation matrix when parity is needed.
+Packets contain a four-byte big-endian frame/block number, a one-byte shard number, and 40 bytes of shard data.
+The resulting bandwidth is 7 × 45 / 160 = 1.96875x, just below the 2.0x cap, with no feedback traffic.
+Please grade the solution at **85 ms** playout delay.
+On profile B, two separate 30-second seeds each missed 1 of 1500 frames (0.07%) at 85 ms.
+The main failure mode is a correlated burst that removes four or more shards belonging to the same frame, or an unseen delay spike beyond the chosen playout window.

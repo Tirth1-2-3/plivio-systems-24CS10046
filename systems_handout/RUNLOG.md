@@ -1,29 +1,29 @@
 # Experiment log
 
-All experiments used the Reed-Solomon-style 4-data/3-parity implementation in
-`sender.cpp` and `receiver.cpp`. The wire packet is 165 bytes, so seven packets
-per four 160-byte source frames use 1.80x the raw bandwidth.
+The final implementation uses immediate per-frame erasure coding: four 40-byte
+data shards and three 40-byte parity shards. Its measured bandwidth is 1.97x.
 
-| Profile | Seed | Duration | Delay | Misses | Miss rate | Overhead | Result | Observation |
-|---|---:|---:|---:|---:|---:|---:|---|---|
-| A (mild) | 1 | 10 s | 100 ms | 0/500 | 0.00% | 1.80x | VALID | Immediate systematic packets plus parity comfortably handle mild loss. |
-| B (moderate) | 1 | 10 s | 100 ms | 4/500 | 0.80% | 1.80x | VALID | Valid, but too close to the 1% limit to recommend. |
-| B (moderate) | 1 | 30 s | 120 ms | 8/1500 | 0.53% | 1.80x | VALID | Full-length timing result; safer margin than 100 ms. |
-| B (moderate) | 2 | 10 s | 120 ms | 2/500 | 0.40% | 1.80x | VALID | A second loss pattern remained valid. |
-| B (moderate) | 1 | 30 s | 120 ms | 10/1500 | 0.67% | 1.80x | VALID | Final validation after robust subset-based decoding. |
+| Design | Profile | Seed | Duration | Delay | Misses | Miss rate | Overhead | Result |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| Original 4-frame FEC | B | 1 | 30 s | 120 ms | 16/1500 | 1.07% | 1.80x | INVALID |
+| 2-frame, 80-byte shards | B | 1 | 10 s | 80 ms | 34/500 | 6.80% | 1.86x | INVALID |
+| 2-frame, 80-byte shards | B | 1 | 30 s | 90 ms | 11/1500 | 0.73% | 1.86x | VALID |
+| 2-frame, 80-byte shards | B | 2 | 30 s | 90 ms | 12/1500 | 0.80% | 1.86x | VALID |
+| Per-frame, 40-byte shards | B | 1 | 10 s | 80 ms | 3/500 | 0.60% | 1.97x | VALID |
+| Per-frame, 40-byte shards | B | 2 | 10 s | 80 ms | 6/500 | 1.20% | 1.97x | INVALID |
+| Per-frame, 40-byte shards | B | 1 | 30 s | 85 ms | 1/1500 | 0.07% | 1.97x | VALID |
+| Per-frame, 40-byte shards | B | 2 | 30 s | 85 ms | 1/1500 | 0.07% | 1.97x | VALID |
+| Per-frame, 40-byte shards | A | 1 | 10 s | 45 ms | 0/500 | 0.00% | 1.97x | VALID |
 
 ## Changes and reasoning
 
-1. Replaced one-shot forwarding with systematic erasure coding, because a
-   resend request and reply would each suffer the hostile network delay/loss.
-2. Chose four data and three parity shards. The receiver can reconstruct a
-   group after any four of its seven packets arrive, including up to three
-   erasures, while staying below the 2.0x bandwidth cap.
-3. Kept data packets systematic and sent them immediately. Frames that survive
-   the network do not wait for the rest of their coding group.
-4. Tested 100 ms first. It worked on both visible profiles, but profile B's
-   0.80% result left little room for unseen random patterns.
-5. Selected 120 ms for grading after a full profile-B run and another seed both
-   stayed below the 1% miss limit.
-6. The receiver now tries every available four-shard subset before decoding.
-   This avoids treating a singular, reordered subset as an unrecoverable block.
+1. The first design encoded four complete frames together. It had good loss
+   protection, but parity for the first frame was unavailable for 60 ms.
+2. Splitting two frames into four 80-byte shards reduced that coding wait to
+   20 ms and made Profile B valid at 90 ms.
+3. The final design splits one frame into four 40-byte shards and creates its
+   three parity shards immediately. This removes coding wait entirely while
+   retaining correction of any three lost packets.
+4. At 80 ms the result depended too closely on relay and process scheduling;
+   one visible seed crossed the miss cap. At 85 ms, both full-length Profile B
+   runs had a wide margin, so **85 ms is the grading recommendation**.

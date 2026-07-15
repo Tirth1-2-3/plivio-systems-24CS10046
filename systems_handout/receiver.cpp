@@ -6,6 +6,7 @@
 #include <cstring>
 #include <map>
 #include <sys/socket.h>
+#include <utility>
 #include <unistd.h>
 
 namespace {
@@ -14,9 +15,9 @@ constexpr int kInputPort = 47002;
 constexpr int kPlayerPort = 47020;
 
 struct Block {
-    std::array<Payload, kShardCount> shards{};
+    std::array<Shard, kShardCount> shards{};
     std::array<bool, kShardCount> received{};
-    std::array<bool, kDataShards> delivered{};
+    std::array<bool, kFramesPerBlock> delivered{};
     int received_count = 0;
     bool decoded = false;
 };
@@ -36,8 +37,8 @@ int open_bound_socket(int port) {
 }
 
 bool send_frame(int socket_fd, const sockaddr_in& player, std::uint32_t sequence,
-                const Payload& payload) {
-    std::array<std::uint8_t, 4 + kPayloadBytes> packet{};
+                const Frame& payload) {
+    std::array<std::uint8_t, 4 + kFrameBytes> packet{};
     const std::uint32_t network_sequence = htonl(sequence);
     std::memcpy(packet.data(), &network_sequence, sizeof(network_sequence));
     std::memcpy(packet.data() + 4, payload.data(), payload.size());
@@ -76,9 +77,25 @@ bool invert(ShardMatrix matrix, ShardMatrix& inverse, const GaloisField& gf) {
     return true;
 }
 
-void forward_missing_frames(int output, const sockaddr_in& player,
-                            std::uint32_t block_number, Block& block,
-                            const GaloisField& gf) {
+void forward_frame(int output, const sockaddr_in& player,
+                   std::uint32_t block_number, int frame_number, Block& block) {
+    if (block.delivered[frame_number]) return;
+    const int first_shard = frame_number * kShardsPerFrame;
+    for (int part = 0; part < kShardsPerFrame; ++part)
+        if (!block.received[first_shard + part]) return;
+
+    Frame frame{};
+    for (int part = 0; part < kShardsPerFrame; ++part)
+        std::memcpy(frame.data() + part * kShardBytes,
+                    block.shards[first_shard + part].data(), kShardBytes);
+    send_frame(output, player,
+               block_number * kFramesPerBlock + frame_number, frame);
+    block.delivered[frame_number] = true;
+}
+
+void recover_block(int output, const sockaddr_in& player,
+                   std::uint32_t block_number, Block& block,
+                   const GaloisField& gf) {
     if (block.received_count < kDataShards || block.decoded) return;
     std::array<int, kDataShards> selected{};
     ShardMatrix inverse{};
@@ -103,16 +120,18 @@ void forward_missing_frames(int output, const sockaddr_in& player,
     }
     if (!found_solution) return;
     for (int original = 0; original < kDataShards; ++original) {
-        if (block.delivered[original]) continue;
-        Payload recovered{};
+        if (block.received[original]) continue;
+        Shard recovered{};
         for (int source = 0; source < kDataShards; ++source)
-            for (int byte = 0; byte < kPayloadBytes; ++byte)
+            for (int byte = 0; byte < kShardBytes; ++byte)
                 recovered[byte] ^= gf.multiply(inverse[original][source],
                                                block.shards[selected[source]][byte]);
-        send_frame(output, player, block_number * kDataShards + original, recovered);
-        block.delivered[original] = true;
+        block.shards[original] = recovered;
+        block.received[original] = true;
     }
     block.decoded = true;
+    for (int frame = 0; frame < kFramesPerBlock; ++frame)
+        forward_frame(output, player, block_number, frame, block);
 }
 }  // namespace
 
@@ -144,14 +163,13 @@ int main() {
         if (block.received[shard]) continue;  // Duplicate caused by the relay.
         block.received[shard] = true;
         ++block.received_count;
-        std::memcpy(block.shards[shard].data(), packet.data() + 5, kPayloadBytes);
+        std::memcpy(block.shards[shard].data(), packet.data() + 5, kShardBytes);
 
         if (shard < kDataShards) {
-            send_frame(output, player, block_number * kDataShards + shard,
-                       block.shards[shard]);
-            block.delivered[shard] = true;
+            forward_frame(output, player, block_number,
+                          shard / kShardsPerFrame, block);
         }
-        forward_missing_frames(output, player, block_number, block, gf);
+        recover_block(output, player, block_number, block, gf);
 
         // Keep delayed/adversarial streams from growing memory forever.
         while (blocks.size() > 256) blocks.erase(blocks.begin());

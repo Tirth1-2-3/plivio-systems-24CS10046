@@ -20,25 +20,24 @@
 
   <h2>Sender</h2>
   <p>The sender receives one numbered 160-byte frame every 20 ms. It divides the
-  sequence into blocks of four frames. Each frame is sent immediately as a
-  systematic shard, so an undamaged packet takes no coding delay. Once all four
-  frames exist, the sender creates three parity shards using a Cauchy coding
-  matrix over GF(256). This gives seven independently impaired UDP datagrams per
-  block.</p>
+  frame immediately into four 40-byte data shards and creates three 40-byte
+  parity shards using a Cauchy coding matrix over GF(256). All seven shards are
+  sent as soon as that frame arrives, so repair information never waits for a
+  later source frame.</p>
 
   <h2>Wire format and bandwidth</h2>
   <p>Every sender-to-receiver datagram contains a 4-byte big-endian block number,
-  a 1-byte shard index, and a 160-byte shard. Seven 165-byte packets protect four
-  160-byte frames: <code>7 * 165 / (4 * 160) = 1.8047x</code>. No feedback packets
+  a 1-byte shard index, and a 40-byte shard. Seven 45-byte packets protect one
+  160-byte frame: <code>7 * 45 / 160 = 1.96875x</code>. No feedback packets
   are used, leaving the measured overhead safely below the 2.0x limit.</p>
 
   <h2>Receiver</h2>
   <p>The receiver stores unique shards by block and ignores relay duplicates.
-  Systematic shards are converted directly back to the harness format and sent
-  to the player. If a frame was lost, receipt of any four shards supplies four
-  independent equations. Gaussian elimination in GF(256) inverts those equations
-  and reconstructs the missing payload byte-for-byte. The reconstructed frame is
-  then emitted with its original sequence number.</p>
+  Four systematic shards can be joined directly into the original frame. If
+  any are lost, receipt of any four of the seven total shards supplies four
+  independent equations. Gaussian elimination in GF(256) reconstructs the
+  missing pieces byte-for-byte, after which the receiver emits the 160-byte
+  frame with its original sequence number.</p>
 
   <h2>Why forward error correction</h2>
   <p>Retransmission requires a loss to be noticed and then sends both a request and
@@ -50,12 +49,12 @@
   <h2>Timing and observed result</h2>
   <table>
     <tr><th>Profile</th><th>Delay</th><th>Miss rate</th><th>Overhead</th></tr>
-    <tr><td>A, seed 1 (10 s)</td><td>100 ms</td><td>0.00%</td><td>1.80x</td></tr>
-    <tr><td>B, seed 1 (30 s)</td><td>120 ms</td><td>0.53%</td><td>1.80x</td></tr>
-    <tr><td>B, seed 2 (10 s)</td><td>120 ms</td><td>0.40%</td><td>1.80x</td></tr>
+    <tr><td>A, seed 1 (10 s)</td><td>45 ms</td><td>0.00%</td><td>1.97x</td></tr>
+    <tr><td>B, seed 1 (30 s)</td><td>85 ms</td><td>0.07%</td><td>1.97x</td></tr>
+    <tr><td>B, seed 2 (30 s)</td><td>85 ms</td><td>0.07%</td><td>1.97x</td></tr>
   </table>
-  <p class="result"><strong>Recommended grading delay: 120 ms.</strong> The main
-  failure modes are a block losing more than three shards and unusually long
-  correlated delay/loss bursts that push all recovery options past a deadline.</p>
+  <p class="result"><strong>Recommended grading delay: 85 ms.</strong> The main
+  failure modes are one frame losing more than three shards and unusually long
+  correlated delay/loss bursts that push all recovery options past its deadline.</p>
 </body>
 </html>

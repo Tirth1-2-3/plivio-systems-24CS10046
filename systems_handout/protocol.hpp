@@ -5,13 +5,23 @@
 
 namespace protocol {
 
+constexpr int kFramesPerBlock = 1;
 constexpr int kDataShards = 4;
 constexpr int kParityShards = 3;
 constexpr int kShardCount = kDataShards + kParityShards;
-constexpr int kPayloadBytes = 160;
-constexpr int kShardPacketBytes = 4 + 1 + kPayloadBytes;
+constexpr int kFrameBytes = 160;
+constexpr int kShardBytes = kFrameBytes * kFramesPerBlock / kDataShards;
+constexpr int kShardsPerFrame = kDataShards / kFramesPerBlock;
+constexpr int kShardPacketBytes = 4 + 1 + kShardBytes;
 
-using Payload = std::array<std::uint8_t, kPayloadBytes>;
+static_assert(kFrameBytes % kDataShards == 0,
+              "A frame must split evenly across the data shards");
+static_assert(kShardCount * kShardPacketBytes <=
+                  2 * kFramesPerBlock * kFrameBytes,
+              "The wire format must stay within the 2x bandwidth cap");
+
+using Frame = std::array<std::uint8_t, kFrameBytes>;
+using Shard = std::array<std::uint8_t, kShardBytes>;
 using ShardMatrix = std::array<std::array<std::uint8_t, kDataShards>, kDataShards>;
 
 // GF(256) with the standard x^8+x^4+x^3+x^2+1 polynomial.
