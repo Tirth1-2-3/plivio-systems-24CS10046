@@ -37,6 +37,10 @@ measured bandwidth and allow recovery from any four packet losses per frame.
 | Final 5+4 FEC | B | 3 | 30 s | 78 ms | 9/1500 | 0.60% | 1.97x | VALID |
 | Final 5+4 FEC | A | 1 | 10 s | 40 ms | 8/500 | 1.60% | 1.97x | INVALID |
 | Final 5+4 FEC | A | 1 | 10 s | 45 ms | 0/500 | 0.00% | 1.97x | VALID |
+| 10+6 FEC experiment | B | 1 | 10 s | 75 ms | 19/500 | 3.80% | 1.90x | INVALID |
+| 10+6 FEC experiment | B | 1 | 10 s | 77 ms | 4/500 | 0.80% | 1.90x | VALID |
+| 10+6 FEC experiment | B | 2 | 10 s | 77 ms | 6/500 | 1.20% | 1.90x | INVALID |
+| 8+5 FEC experiment | B | 1 | 10 s | 77 ms | 8/500 | 1.60% | 1.87x | INVALID |
 
 ## Changes and reasoning
 
@@ -55,3 +59,6 @@ measured bandwidth and allow recovery from any four packet losses per frame.
    one additional parity equation. It spends more of the allowed bandwidth but
    raises the loss/late-packet tolerance from three to four; **78 ms is the final
    recommendation**, while 77 ms failed the boundary test.
+7. Larger 10+6 and 8+5 layouts were tested at 77 ms. Their extra UDP packet and
+   decoding work erased the theoretical benefit: each failed at least one seed,
+   so the simpler 5+4 layout remains the lowest reliable measured design.
