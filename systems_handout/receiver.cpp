@@ -98,27 +98,16 @@ void recover_block(int output, const sockaddr_in& player,
                    const GaloisField& gf) {
     if (block.received_count < kDataShards || block.decoded) return;
     std::array<int, kDataShards> selected{};
+    ShardMatrix equations{};
     ShardMatrix inverse{};
-    bool found_solution = false;
-
-    // Reordering may make the first four received shards linearly dependent.
-    // Try every small combination, so a later packet can still unlock recovery.
-    for (int a = 0; a < kShardCount && !found_solution; ++a) {
-        for (int b = a + 1; b < kShardCount && !found_solution; ++b) {
-            for (int c = b + 1; c < kShardCount && !found_solution; ++c) {
-                for (int d = c + 1; d < kShardCount && !found_solution; ++d) {
-                    if (!block.received[a] || !block.received[b] ||
-                        !block.received[c] || !block.received[d]) continue;
-                    selected = {a, b, c, d};
-                    ShardMatrix equations{};
-                    for (int row = 0; row < kDataShards; ++row)
-                        equations[row] = coding_row(selected[row], gf);
-                    found_solution = invert(equations, inverse, gf);
-                }
-            }
-        }
+    int row = 0;
+    for (int shard = 0; shard < kShardCount && row < kDataShards; ++shard) {
+        if (!block.received[shard]) continue;
+        selected[row] = shard;
+        equations[row] = coding_row(shard, gf);
+        ++row;
     }
-    if (!found_solution) return;
+    if (!invert(equations, inverse, gf)) return;
     for (int original = 0; original < kDataShards; ++original) {
         if (block.received[original]) continue;
         Shard recovered{};
@@ -157,8 +146,8 @@ int main() {
             (static_cast<std::uint32_t>(packet[0]) << 16) |
             (static_cast<std::uint32_t>(packet[1]) << 8) |
             static_cast<std::uint32_t>(packet[2]);
-        const std::uint32_t block_number = wire_id >> 3;
-        const int shard = wire_id & 0x07;
+        const std::uint32_t block_number = wire_id >> 4;
+        const int shard = wire_id & 0x0f;
         if (shard >= kShardCount) continue;
 
         Block& block = blocks[block_number];

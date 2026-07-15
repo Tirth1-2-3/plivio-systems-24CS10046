@@ -16,9 +16,9 @@ constexpr int kRelayPort = 47001;
 bool send_shard(int socket_fd, const sockaddr_in& relay, std::uint32_t block,
                 std::uint8_t shard, const Shard& payload) {
     std::array<std::uint8_t, kShardPacketBytes> packet{};
-    // Pack a 21-bit frame number and 3-bit shard number into three bytes.
-    // At 50 frames/second, the frame field lasts more than 11 hours.
-    const std::uint32_t wire_id = (block << 3) | shard;
+    // Pack a 20-bit frame number and 4-bit shard number into three bytes.
+    // At 50 frames/second, the frame field lasts more than five hours.
+    const std::uint32_t wire_id = (block << 4) | shard;
     packet[0] = static_cast<std::uint8_t>(wire_id >> 16);
     packet[1] = static_cast<std::uint8_t>(wire_id >> 8);
     packet[2] = static_cast<std::uint8_t>(wire_id);

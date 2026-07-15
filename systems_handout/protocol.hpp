@@ -6,8 +6,8 @@
 namespace protocol {
 
 constexpr int kFramesPerBlock = 1;
-constexpr int kDataShards = 4;
-constexpr int kParityShards = 3;
+constexpr int kDataShards = 5;
+constexpr int kParityShards = 4;
 constexpr int kShardCount = kDataShards + kParityShards;
 constexpr int kFrameBytes = 160;
 constexpr int kShardBytes = kFrameBytes * kFramesPerBlock / kDataShards;
@@ -20,7 +20,7 @@ static_assert(kFrameBytes % kDataShards == 0,
 static_assert(kShardCount * kShardPacketBytes <=
                   2 * kFramesPerBlock * kFrameBytes,
               "The wire format must stay within the 2x bandwidth cap");
-static_assert(kShardCount <= 8, "The shard number must fit in three bits");
+static_assert(kShardCount <= 16, "The shard number must fit in four bits");
 
 using Frame = std::array<std::uint8_t, kFrameBytes>;
 using Shard = std::array<std::uint8_t, kShardBytes>;

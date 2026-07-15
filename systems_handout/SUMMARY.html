@@ -20,22 +20,22 @@
 
   <h2>Sender</h2>
   <p>The sender receives one numbered 160-byte frame every 20 ms. It divides the
-  frame immediately into four 40-byte data shards and creates three 40-byte
-  parity shards using a Cauchy coding matrix over GF(256). All seven shards are
+  frame immediately into five 32-byte data shards and creates four 32-byte
+  parity shards using a Cauchy coding matrix over GF(256). All nine shards are
   sent as soon as that frame arrives, so repair information never waits for a
   later source frame.</p>
 
   <h2>Wire format and bandwidth</h2>
   <p>Every sender-to-receiver datagram contains a compact 3-byte identifier that
-  combines a 21-bit frame number with a 3-bit shard index, followed by a 40-byte
-  shard. Seven 43-byte packets protect one 160-byte frame:
-  <code>7 * 43 / 160 = 1.88125x</code>. No feedback packets
+  combines a 20-bit frame number with a 4-bit shard index, followed by a 32-byte
+  shard. Nine 35-byte packets protect one 160-byte frame:
+  <code>9 * 35 / 160 = 1.96875x</code>. No feedback packets
   are used, leaving the measured overhead safely below the 2.0x limit.</p>
 
   <h2>Receiver</h2>
   <p>The receiver stores unique shards by block and ignores relay duplicates.
-  Four systematic shards can be joined directly into the original frame. If
-  any are lost, receipt of any four of the seven total shards supplies four
+  Five systematic shards can be joined directly into the original frame. If
+  any are lost, receipt of any five of the nine total shards supplies five
   independent equations. Gaussian elimination in GF(256) reconstructs the
   missing pieces byte-for-byte, after which the receiver emits the 160-byte
   frame with its original sequence number.</p>
@@ -44,19 +44,19 @@
   <p>Retransmission requires a loss to be noticed and then sends both a request and
   a reply through the same lossy, delayed relay. Proactive parity spends bandwidth
   before a loss is known and usually makes recovery available as soon as the last
-  data/parity packets in a block arrive. Up to three lost datagrams in one
-  seven-packet block are recoverable.</p>
+  data/parity packets in a block arrive. Up to four lost datagrams in one
+  nine-packet block are recoverable.</p>
 
   <h2>Timing and observed result</h2>
   <table>
     <tr><th>Profile</th><th>Delay</th><th>Miss rate</th><th>Overhead</th></tr>
-    <tr><td>A, seed 1 (10 s)</td><td>45 ms</td><td>0.40%</td><td>1.88x</td></tr>
-    <tr><td>B, seed 1 (30 s)</td><td>80 ms</td><td>0.73%</td><td>1.88x</td></tr>
-    <tr><td>B, seed 2 (30 s)</td><td>80 ms</td><td>0.73%</td><td>1.88x</td></tr>
-    <tr><td>B, seed 3 (30 s)</td><td>80 ms</td><td>0.47%</td><td>1.88x</td></tr>
+    <tr><td>A, seed 1 (10 s)</td><td>45 ms</td><td>0.00%</td><td>1.97x</td></tr>
+    <tr><td>B, seed 1 (30 s)</td><td>78 ms</td><td>0.73%</td><td>1.97x</td></tr>
+    <tr><td>B, seed 2 (30 s)</td><td>78 ms</td><td>0.60%</td><td>1.97x</td></tr>
+    <tr><td>B, seed 3 (30 s)</td><td>78 ms</td><td>0.60%</td><td>1.97x</td></tr>
   </table>
-  <p class="result"><strong>Recommended grading delay: 80 ms.</strong> The main
-  failure modes are one frame losing more than three shards and unusually long
+  <p class="result"><strong>Recommended grading delay: 78 ms.</strong> The main
+  failure modes are one frame losing more than four shards and unusually long
   correlated delay/loss bursts that push all recovery options past its deadline.</p>
 </body>
 </html>

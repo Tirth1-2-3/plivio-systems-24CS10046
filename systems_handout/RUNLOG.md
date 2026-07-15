@@ -1,8 +1,8 @@
 # Experiment log
 
-The final implementation uses immediate per-frame erasure coding: four 40-byte
-data shards and three 40-byte parity shards. A compact three-byte wire ID lowers
-its measured bandwidth to 1.88x.
+The final implementation uses immediate per-frame erasure coding: five 32-byte
+data shards and four 32-byte parity shards. Nine 35-byte packets produce 1.97x
+measured bandwidth and allow recovery from any four packet losses per frame.
 
 | Design | Profile | Seed | Duration | Delay | Misses | Miss rate | Overhead | Result |
 |---|---|---:|---:|---:|---:|---:|---:|---|
@@ -28,6 +28,15 @@ its measured bandwidth to 1.88x.
 | Compact 3-byte ID | B | 2 | 30 s | 80 ms | 11/1500 | 0.73% | 1.88x | VALID |
 | Compact 3-byte ID | B | 3 | 30 s | 80 ms | 7/1500 | 0.47% | 1.88x | VALID |
 | Compact 3-byte ID | A | 1 | 10 s | 45 ms | 2/500 | 0.40% | 1.88x | VALID |
+| Final 5+4 FEC | B | 1 | 10 s | 75 ms | 12/500 | 2.40% | 1.97x | INVALID |
+| Final 5+4 FEC | B | 1 | 10 s | 77 ms | 6/500 | 1.20% | 1.97x | INVALID |
+| Final 5+4 FEC | B | 1 | 10 s | 78 ms | 3/500 | 0.60% | 1.97x | VALID |
+| Final 5+4 FEC | B | 2 | 10 s | 78 ms | 3/500 | 0.60% | 1.97x | VALID |
+| Final 5+4 FEC | B | 1 | 30 s | 78 ms | 11/1500 | 0.73% | 1.97x | VALID |
+| Final 5+4 FEC | B | 2 | 30 s | 78 ms | 9/1500 | 0.60% | 1.97x | VALID |
+| Final 5+4 FEC | B | 3 | 30 s | 78 ms | 9/1500 | 0.60% | 1.97x | VALID |
+| Final 5+4 FEC | A | 1 | 10 s | 40 ms | 8/500 | 1.60% | 1.97x | INVALID |
+| Final 5+4 FEC | A | 1 | 10 s | 45 ms | 0/500 | 0.00% | 1.97x | VALID |
 
 ## Changes and reasoning
 
@@ -40,7 +49,9 @@ its measured bandwidth to 1.88x.
    retaining correction of any three lost packets.
 4. Removing one parity packet saved bandwidth but exceeded the miss cap, so the
    final design retains all three parity shards.
-5. Combining the frame and shard numbers into a three-byte ID reduced overhead
-   from 1.97x to 1.88x. It also reduced packet processing enough for three full
-   Profile B seeds to remain valid at **80 ms**, which is the final grading
-   recommendation; 79 ms failed the boundary test.
+5. Combining the frame and shard numbers into a three-byte ID reduced the 4+3
+   design's overhead from 1.97x to 1.88x and made 80 ms consistently valid.
+6. To lower delay further, the final 5+4 layout uses smaller 32-byte shards and
+   one additional parity equation. It spends more of the allowed bandwidth but
+   raises the loss/late-packet tolerance from three to four; **78 ms is the final
+   recommendation**, while 77 ms failed the boundary test.
